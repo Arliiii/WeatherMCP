@@ -1,0 +1,1098 @@
+TITLE: Connecting FastMCP Client with Streamable HTTP (Default)
+DESCRIPTION: This example shows how to connect a FastMCP client to a server running the Streamable HTTP transport on the default address (http://127.0.0.1:8000/mcp). It uses an asynchronous context manager to establish the connection and then calls the `ping` method to test the connection.
+SOURCE: https://gofastmcp.com/deployment/running-server.md#_snippet_6
+
+LANGUAGE: python
+CODE:
+```
+import asyncio
+from fastmcp import Client
+
+async def example():
+    async with Client("http://127.0.0.1:8000/mcp") as client:
+        await client.ping()
+
+if __name__ == "__main__":
+    asyncio.run(example())
+```
+
+----------------------------------------
+
+TITLE: Initializing FastMCP Server in Python
+DESCRIPTION: This snippet shows the basic code required to create a FastMCP server instance by importing the `FastMCP` class and instantiating it with a name.
+SOURCE: https://gofastmcp.com/getting-started/quickstart.md#_snippet_0
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+
+mcp = FastMCP("My MCP Server")
+```
+
+----------------------------------------
+
+TITLE: Running FastMCP Server from Python Script
+DESCRIPTION: This snippet demonstrates how to run a FastMCP server directly from a Python script by calling the `run()` method on the FastMCP instance. It is best practice to place this call within an `if __name__ == "__main__":` block to ensure the server only starts when the script is executed directly.
+SOURCE: https://gofastmcp.com/deployment/running-server.md#_snippet_0
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+
+mcp = FastMCP(name="MyServer")
+
+@mcp.tool()
+def hello(name: str) -> str:
+    return f"Hello, {name}!"
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+----------------------------------------
+
+TITLE: Accessing MCP Context in a Tool
+DESCRIPTION: Shows how to access the MCP Context object within a tool function by adding a parameter with the 'Context' type hint. The example demonstrates using the context for logging ('ctx.info'), reading resources ('ctx.read_resource'), reporting progress ('ctx.report_progress'), and interacting with the client's LLM ('ctx.sample').
+SOURCE: https://gofastmcp.com/servers/tools.md#_snippet_12
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP, Context
+
+mcp = FastMCP(name="ContextDemo")
+
+@mcp.tool()
+async def process_data(data_uri: str, ctx: Context) -> dict:
+    """Process data from a resource with progress reporting."""
+    await ctx.info(f"Processing data from {data_uri}")
+    
+    # Read a resource
+    resource = await ctx.read_resource(data_uri)
+    data = resource[0].content if resource else ""
+    
+    # Report progress
+    await ctx.report_progress(progress=50, total=100)
+    
+    # Example request to the client's LLM for help
+    summary = await ctx.sample(f"Summarize this in 10 words: {data[:200]}")
+    
+    await ctx.report_progress(progress=100, total=100)
+    return {
+        "length": len(data),
+        "summary": summary.text
+    }
+```
+
+----------------------------------------
+
+TITLE: Using Type Annotations for Tool Parameters (Python)
+DESCRIPTION: Shows how to use standard Python type annotations (`str`, `int`, `str | None`) for function parameters. These annotations are crucial for FastMCP to inform the LLM client about expected data types and enable input validation.
+SOURCE: https://gofastmcp.com/servers/tools.md#_snippet_2
+
+LANGUAGE: python
+CODE:
+```
+@mcp.tool()
+def analyze_text(
+    text: str,
+    max_tokens: int = 100,
+    language: str | None = None
+) -> dict:
+    """Analyze the provided text."""
+    # Implementation...
+```
+
+----------------------------------------
+
+TITLE: Defining Server Tool (Python)
+DESCRIPTION: Shows how to define a Python function as a server tool using the @mcp.tool() decorator, making it callable by FastMCP clients.
+SOURCE: https://gofastmcp.com/servers/fastmcp.md#_snippet_2
+
+LANGUAGE: python
+CODE:
+```
+@mcp.tool()
+def multiply(a: float, b: float) -> float:
+    """Multiplies two numbers together."""
+    return a * b
+```
+
+----------------------------------------
+
+TITLE: Installing FastMCP with uv pip or pip
+DESCRIPTION: These commands show how to install FastMCP globally or into a virtual environment using either uv pip or the standard pip command.
+SOURCE: https://gofastmcp.com/getting-started/installation.md#_snippet_1
+
+LANGUAGE: bash
+CODE:
+```
+uv pip install fastmcp
+```
+
+LANGUAGE: bash
+CODE:
+```
+pip install fastmcp
+```
+
+----------------------------------------
+
+TITLE: Adding FastMCP Dependency with uv
+DESCRIPTION: Use this command to add FastMCP as a dependency to your project using the uv package manager.
+SOURCE: https://gofastmcp.com/getting-started/installation.md#_snippet_0
+
+LANGUAGE: bash
+CODE:
+```
+uv add fastmcp
+```
+
+----------------------------------------
+
+TITLE: Managing FastMCP Client Connection Lifecycle (Python)
+DESCRIPTION: Illustrates the asynchronous context manager (`async with`) for managing the `fastmcp.Client` connection. The connection is established upon entering the block and closed upon exiting. Demonstrates making asynchronous MCP calls like `list_tools` and `call_tool` within the active session. Requires `asyncio` and `fastmcp`.
+SOURCE: https://gofastmcp.com/clients/client.md#_snippet_2
+
+LANGUAGE: Python
+CODE:
+```
+import asyncio
+from fastmcp import Client
+
+client = Client("my_mcp_server.py") # Assumes my_mcp_server.py exists
+
+async def main():
+    # Connection is established here
+    async with client:
+        print(f"Client connected: {client.is_connected()}")
+
+        # Make MCP calls within the context
+        tools = await client.list_tools()
+        print(f"Available tools: {tools}")
+
+        if any(tool.name == "greet" for tool in tools):
+            result = await client.call_tool("greet", {"name": "World"})
+            print(f"Greet result: {result}")
+
+    # Connection is closed automatically here
+    print(f"Client connected: {client.is_connected()}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+----------------------------------------
+
+TITLE: Mounting FastMCP in FastAPI App (Python)
+DESCRIPTION: Shows how to integrate a FastMCP HTTP application into a FastAPI application. It involves creating the FastMCP server and its HTTP app, then mounting the FastMCP app onto a specific path within the FastAPI application, ensuring the lifespan context is correctly passed to the FastAPI app for proper initialization of the session manager.
+SOURCE: https://gofastmcp.com/deployment/asgi.md#_snippet_9
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+from fastapi import FastAPI
+from starlette.routing import Mount
+
+# Create your FastMCP server as well as any tools, resources, etc.
+mcp = FastMCP("MyServer")
+
+# Create the ASGI app
+mcp_app = mcp.http_app(path='/mcp')
+
+# Create a FastAPI app and mount the MCP server
+app = FastAPI(lifespan=mcp_app.router.lifespan_context)
+app.mount("/mcp-server", mcp_app)
+```
+
+----------------------------------------
+
+TITLE: Running FastMCP Server (Python)
+DESCRIPTION: Shows the standard way to start a FastMCP server instance using the mcp.run() method, typically within an if __name__ == "__main__": block, and mentions how to specify different transport options.
+SOURCE: https://gofastmcp.com/servers/fastmcp.md#_snippet_6
+
+LANGUAGE: python
+CODE:
+```
+# my_server.py
+from fastmcp import FastMCP
+
+mcp = FastMCP(name="MyServer")
+
+@mcp.tool()
+def greet(name: str) -> str:
+    """Greet a user by name."""
+    return f"Hello, {name}!"
+
+if __name__ == "__main__":
+    # This runs the server, defaulting to STDIO transport
+    mcp.run()
+    
+    # To use a different transport, e.g., HTTP:
+    # mcp.run(transport="streamable-http", host="127.0.0.1", port=9000)
+```
+
+----------------------------------------
+
+TITLE: Running Development Server with Dependencies (fastmcp CLI) - Bash
+DESCRIPTION: Demonstrates how to start the fastmcp development server using the `dev` command. It includes options for installing the current directory (`.`) in editable mode (`-e`) and specifying additional Python packages (`--with pandas --with matplotlib`) required by the server.
+SOURCE: https://gofastmcp.com/deployment/cli.md#_snippet_8
+
+LANGUAGE: bash
+CODE:
+```
+# Run dev server with editable mode and additional packages
+fastmcp dev server.py -e . --with pandas --with matplotlib
+```
+
+----------------------------------------
+
+TITLE: Running FastMCP Server with Streamable HTTP (Default)
+DESCRIPTION: This snippet demonstrates how to start a FastMCP server using the Streamable HTTP transport. It initializes the FastMCP application and calls the `run` method, specifying the 'streamable-http' transport. By default, this will start a Uvicorn server on 127.0.0.1:8000 with the path /mcp.
+SOURCE: https://gofastmcp.com/deployment/running-server.md#_snippet_5
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+
+mcp = FastMCP()
+
+if __name__ == "__main__":
+    mcp.run(transport="streamable-http")
+```
+
+----------------------------------------
+
+TITLE: Running FastMCP Server with Inspector (Bash)
+DESCRIPTION: Shows the command to run a FastMCP server using `fastmcp dev`, which launches the server in an isolated environment with the MCP Inspector for testing. Dependencies must be explicitly specified.
+SOURCE: https://gofastmcp.com/deployment/cli.md#_snippet_5
+
+LANGUAGE: bash
+CODE:
+```
+fastmcp dev server.py
+```
+
+----------------------------------------
+
+TITLE: Adding Tool to FastMCP Server in Python
+DESCRIPTION: This code demonstrates how to add a tool to the FastMCP server. It defines a Python function `greet` and registers it as a tool using the `@mcp.tool()` decorator.
+SOURCE: https://gofastmcp.com/getting-started/quickstart.md#_snippet_1
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+
+mcp = FastMCP("My MCP Server")
+
+@mcp.tool()
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
+```
+
+----------------------------------------
+
+TITLE: Defining a Basic FastMCP Tool (Python)
+DESCRIPTION: Demonstrates how to define a simple tool in FastMCP by decorating a Python function with `@mcp.tool()`. FastMCP automatically uses the function name, docstring, and type hints to generate the tool schema.
+SOURCE: https://gofastmcp.com/servers/tools.md#_snippet_1
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+
+mcp = FastMCP(name="CalculatorServer")
+
+@mcp.tool()
+def add(a: int, b: int) -> int:
+    """Adds two integer numbers together."""
+    return a + b
+```
+
+----------------------------------------
+
+TITLE: Converting FastAPI App to FastMCP Server (Python)
+DESCRIPTION: This snippet shows how to initialize a basic FastAPI application with a few routes and then convert it into a FastMCP server instance using the `FastMCP.from_fastapi()` method. It demonstrates the core process of integration.
+SOURCE: https://gofastmcp.com/patterns/fastapi.md#_snippet_0
+
+LANGUAGE: python
+CODE:
+```
+from fastapi import FastAPI
+from fastmcp import FastMCP
+
+
+# A FastAPI app
+app = FastAPI()
+
+@app.get("/items")
+def list_items():
+    return [{"id": 1, "name": "Item 1"}, {"id": 2, "name": "Item 2"}]
+
+@app.get("/items/{item_id}")
+def get_item(item_id: int):
+    return {"id": item_id, "name": f"Item {item_id}"}
+
+@app.post("/items")
+def create_item(name: str):
+    return {"id": 3, "name": name}
+
+
+# Create an MCP server from your FastAPI app
+mcp = FastMCP.from_fastapi(app=app)
+
+if __name__ == "__main__":
+    mcp.run()  # Start the MCP server
+```
+
+----------------------------------------
+
+TITLE: Adding Parameter Metadata with Pydantic Field and Annotated (Python)
+DESCRIPTION: Illustrates the preferred method for adding rich metadata and validation rules to tool parameters using `typing.Annotated` and `pydantic.Field`. This provides descriptions for the LLM and enables server-side validation.
+SOURCE: https://gofastmcp.com/servers/tools.md#_snippet_3
+
+LANGUAGE: python
+CODE:
+```
+from typing import Annotated
+from pydantic import Field
+
+@mcp.tool()
+def process_image(
+    image_url: Annotated[str, Field(description="URL of the image to process")],
+    resize: Annotated[bool, Field(description="Whether to resize the image")] = False,
+    width: Annotated[int, Field(description="Target width in pixels", ge=1, le=2000)] = 800,
+    format: Annotated[
+        Literal["jpeg", "png", "webp"],
+        Field(description="Output image format")
+    ] = "jpeg"
+) -> dict:
+    """Process an image with optional resizing."""
+    # Implementation...
+```
+
+----------------------------------------
+
+TITLE: Defining FastMCP Resource Templates with Parameters (Python)
+DESCRIPTION: This snippet shows how to define resource templates using the `@mcp.resource` decorator in FastMCP. It includes two examples: one with a single parameter (`{city}`) and another with multiple parameters (`{owner}/{repo}`). The function arguments correspond to the URI parameters, allowing dynamic resource generation based on client requests. It requires the `fastmcp` library.
+SOURCE: https://gofastmcp.com/servers/resources.md#_snippet_7
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+
+mcp = FastMCP(name="DataServer")
+
+# Template URI includes {city} placeholder
+@mcp.resource("weather://{city}/current")
+def get_weather(city: str) -> dict:
+    """Provides weather information for a specific city."""
+    # In a real implementation, this would call a weather API
+    # Here we're using simplified logic for example purposes
+    return {
+        "city": city.capitalize(),
+        "temperature": 22,
+        "condition": "Sunny",
+        "unit": "celsius"
+    }
+
+# Template with multiple parameters
+@mcp.resource("repos://{owner}/{repo}/info")
+def get_repo_info(owner: str, repo: str) -> dict:
+    """Retrieves information about a GitHub repository."""
+    # In a real implementation, this would call the GitHub API
+    return {
+        "owner": owner,
+        "name": repo,
+        "full_name": f"{owner}/{repo}",
+        "stars": 120,
+        "forks": 48
+    }
+```
+
+----------------------------------------
+
+TITLE: Running FastMCP Server for Development
+DESCRIPTION: This command uses the `fastmcp dev` command to run the server with the built-in MCP Inspector. This is useful for development and testing purposes, providing a web interface to interact with the server.
+SOURCE: https://gofastmcp.com/deployment/running-server.md#_snippet_3
+
+LANGUAGE: bash
+CODE:
+```
+fastmcp dev server.py
+```
+
+----------------------------------------
+
+TITLE: Fetching Weather Data (Async) - Python
+DESCRIPTION: Demonstrates an asynchronous FastMCP tool (`async def`) suitable for I/O-bound tasks like network requests. It uses `aiohttp` to fetch weather data and includes basic error checking.
+SOURCE: https://gofastmcp.com/servers/tools.md#_snippet_8
+
+LANGUAGE: python
+CODE:
+```
+# Asynchronous tool (ideal for I/O-bound operations)
+@mcp.tool()
+async def fetch_weather(city: str) -> dict:
+    """Retrieve current weather conditions for a city."""
+    # Use 'async def' for operations involving network calls, file I/O, etc.
+    # This prevents blocking the server while waiting for external operations.
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"https://api.example.com/weather/{city}") as response:
+            # Check response status before returning
+            response.raise_for_status()
+            return await response.json()
+```
+
+----------------------------------------
+
+TITLE: Instantiating FastMCP Server (Python)
+DESCRIPTION: Demonstrates how to create a basic FastMCP server instance, optionally providing a name and initial instructions to guide client interaction.
+SOURCE: https://gofastmcp.com/servers/fastmcp.md#_snippet_1
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+
+# Create a basic server instance
+mcp = FastMCP(name="MyAssistantServer")
+
+# You can also add instructions for how to interact with the server
+mcp_with_instructions = FastMCP(
+    name="HelpfulAssistant",
+    instructions="""
+        This server provides data analysis tools.
+        Call get_average() to analyze numerical data.
+        """
+)
+```
+
+----------------------------------------
+
+TITLE: Running FastMCP Server with Streamable HTTP (Custom Config)
+DESCRIPTION: This snippet demonstrates starting a FastMCP server with the Streamable HTTP transport using custom configuration options. It sets a specific host ('127.0.0.1'), port (4200), path ('/my-custom-path'), and log level ('debug') by passing keyword arguments to the `run` method.
+SOURCE: https://gofastmcp.com/deployment/running-server.md#_snippet_7
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+
+mcp = FastMCP()
+
+if __name__ == "__main__":
+    mcp.run(
+        transport="streamable-http",
+        host="127.0.0.1",
+        port=4200,
+        path="/my-custom-path",
+        log_level="debug",
+    )
+```
+
+----------------------------------------
+
+TITLE: Defining Server Resource (Python)
+DESCRIPTION: Illustrates defining a Python function as a server resource using the @mcp.resource() decorator with a URI, providing static data to clients.
+SOURCE: https://gofastmcp.com/servers/fastmcp.md#_snippet_3
+
+LANGUAGE: python
+CODE:
+```
+@mcp.resource("data://config")
+def get_config() -> dict:
+    """Provides the application configuration."""
+    return {"theme": "dark", "version": "1.0"}
+```
+
+----------------------------------------
+
+TITLE: Running FastMCP Server via CLI
+DESCRIPTION: This command shows the basic usage of the FastMCP command-line interface to run a server defined in a Python file. The `fastmcp run` command automatically finds a FastMCP object (named `mcp`, `server`, or `app`) in the specified file and calls its `run()` method.
+SOURCE: https://gofastmcp.com/deployment/running-server.md#_snippet_1
+
+LANGUAGE: bash
+CODE:
+```
+fastmcp run server.py
+```
+
+----------------------------------------
+
+TITLE: Running FastMCP Server using CLI Command in Bash
+DESCRIPTION: This command demonstrates how to run the FastMCP server defined in `my_server.py` using the `fastmcp run` command-line interface, specifying the file and the server object name (`mcp`).
+SOURCE: https://gofastmcp.com/getting-started/quickstart.md#_snippet_5
+
+LANGUAGE: bash
+CODE:
+```
+fastmcp run my_server.py:mcp
+```
+
+----------------------------------------
+
+TITLE: Using Pydantic Models with FastMCP Python
+DESCRIPTION: Demonstrates how to define and use Pydantic models (`BaseModel`) as parameters for FastMCP tool functions. This approach provides structured data handling, automatic validation, and schema generation, allowing clients to provide complex data as JSON or dictionaries.
+SOURCE: https://gofastmcp.com/servers/tools.md#_snippet_23
+
+LANGUAGE: python
+CODE:
+```
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class User(BaseModel):
+    username: str
+    email: str = Field(description="User's email address")
+    age: int | None = None
+    is_active: bool = True
+
+@mcp.tool()
+def create_user(user: User):
+    """Create a new user in the system."""
+    # The input is automatically validated against the User model
+    # Even if provided as a JSON string or dict
+    # Implementation...
+```
+
+----------------------------------------
+
+TITLE: Generating Code Example using LLM Sampling (Python)
+DESCRIPTION: Demonstrates using `ctx.sample` with a list of messages, a system prompt, temperature, and max_tokens to generate a Python code example via the client's LLM. It formats the output as a markdown code block. Requires the `Context` object.
+SOURCE: https://gofastmcp.com/servers/context.md#_snippet_8
+
+LANGUAGE: python
+CODE:
+```
+@@mcp.tool()
+async def generate_example(concept: str, ctx: Context) -> str:
+    """Generate a Python code example for a given concept."""
+    # Using a system prompt and a user message
+    response = await ctx.sample(
+        messages=f"Write a simple Python code example demonstrating '{concept}'.",
+        system_prompt="You are an expert Python programmer. Provide concise, working code examples without explanations.",
+        temperature=0.7,
+        max_tokens=300
+    )
+    
+    code_example = response.text
+    return f"```python\n{code_example}\n```"
+```
+
+----------------------------------------
+
+TITLE: Accessing Context in FastMCP Tool via Parameter Injection (Python)
+DESCRIPTION: Demonstrates how to receive the FastMCP `Context` object as a function parameter (`ctx: Context`) within a tool defined using `@mcp.tool()`, enabling access to MCP session capabilities like logging and resource access.
+SOURCE: https://gofastmcp.com/servers/context.md#_snippet_0
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP, Context
+
+mcp = FastMCP(name="ContextDemo")
+
+@mcp.tool()
+async def process_file(file_uri: str, ctx: Context) -> str:
+    """Processes a file, using context for logging and resource access."""
+    # Context is available as the ctx parameter
+    return "Processed file"
+```
+
+----------------------------------------
+
+TITLE: Testing FastMCP Server In-Memory with Pytest
+DESCRIPTION: This snippet demonstrates how to perform in-memory testing of a FastMCP server using pytest. It sets up a server fixture, defines a simple tool, and uses a Client instance connected directly to the server to call the tool and verify the output.
+SOURCE: https://gofastmcp.com/patterns/testing.md#_snippet_0
+
+LANGUAGE: python
+CODE:
+```
+import pytest
+from fastmcp import FastMCP, Client
+
+@pytest.fixture
+def mcp_server():
+    server = FastMCP("TestServer")
+    
+    @server.tool()
+    def greet(name: str) -> str:
+        return f"Hello, {name}!"
+        
+    return server
+
+async def test_tool_functionality(mcp_server):
+    # Pass the server directly to the Client constructor
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("greet", {"name": "World"})
+        assert "Hello, World!" in str(result[0])
+```
+
+----------------------------------------
+
+TITLE: Using Built-in Scalar Parameter Types
+DESCRIPTION: Illustrates the use of common Python built-in scalar types (str, int, float, bool) as parameters in a FastMCP tool function. FastMCP supports these types and provides type coercion, allowing it to validate and parse inputs correctly.
+SOURCE: https://gofastmcp.com/servers/tools.md#_snippet_13
+
+LANGUAGE: python
+CODE:
+```
+@mcp.tool()
+def process_values(
+    name: str,             # Text data
+    count: int,            # Integer numbers
+    amount: float,         # Floating point numbers
+    enabled: bool          # Boolean values (True/False)
+):
+    """Process various value types."""
+    # Implementation...
+
+```
+
+----------------------------------------
+
+TITLE: Creating FastMCP Client to Connect to Server File in Python
+DESCRIPTION: This code shows how to create a client that connects to a FastMCP server defined in a separate file (`my_server.py`) by passing the file path to the `Client` constructor and then calling a tool asynchronously.
+SOURCE: https://gofastmcp.com/getting-started/quickstart.md#_snippet_4
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import Client
+
+client = Client("my_server.py")
+
+async def call_tool(name: str):
+    async with client:
+        result = await client.call_tool("greet", {"name": name})
+        print(result)
+
+import asyncio
+asyncio.run(call_tool("Ford"))
+```
+
+----------------------------------------
+
+TITLE: Initializing FastMCP from OpenAPI Spec (Python)
+DESCRIPTION: Demonstrates how to create a FastMCP server instance using an OpenAPI specification and an httpx client. It shows the basic setup and how to start the server. Requires fastmcp and httpx.
+SOURCE: https://gofastmcp.com/patterns/openapi.md#_snippet_0
+
+LANGUAGE: python
+CODE:
+```
+import httpx
+from fastmcp import FastMCP
+
+# Create a client for your API
+api_client = httpx.AsyncClient(base_url="https://api.example.com")
+
+# Load your OpenAPI spec
+spec = {...} 
+
+# Create an MCP server from your OpenAPI spec
+mcp = FastMCP.from_openapi(openapi_spec=spec, client=api_client)
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+----------------------------------------
+
+TITLE: Adding Custom HTTP Route to FastMCP (Python)
+DESCRIPTION: Illustrates how to define a custom web endpoint (`/health`) on a FastMCP server using the `@custom_route` decorator. This allows adding simple HTTP handlers alongside the main MCP endpoint. It uses `starlette.requests.Request` and `starlette.responses.JSONResponse` for handling the request and response.
+SOURCE: https://gofastmcp.com/deployment/running-server.md#_snippet_14
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+mcp = FastMCP("MyServer")
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> JSONResponse:
+    return JSONResponse({"status": "healthy"})
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+----------------------------------------
+
+TITLE: Setting Dynamic Roots Callback for fastmcp Client (Python)
+DESCRIPTION: Illustrates how to provide an asynchronous function as the `roots` parameter to the fastmcp Client. This callback function is executed when the server requests roots, allowing the client to dynamically determine and return the appropriate list of root paths based on the provided `RequestContext`.
+SOURCE: https://gofastmcp.com/clients/client.md#_snippet_12
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import Client
+from fastmcp.client.roots import RequestContext
+
+async def roots_callback(context: RequestContext) -> list[str]:
+    print(f"Server requested roots (Request ID: {context.request_id})")
+    return ["/path/to/root1", "/path/to/root2"]
+
+client = Client(
+    ..., 
+    roots=roots_callback,
+)
+```
+
+----------------------------------------
+
+TITLE: Accessing Context in FastMCP Resource/Template via Parameter Injection (Python)
+DESCRIPTION: Shows how FastMCP resource and template functions defined with `@mcp.resource()` can receive the `Context` object via parameter injection (`ctx: Context`) to access context-specific information or perform context-aware operations.
+SOURCE: https://gofastmcp.com/servers/context.md#_snippet_1
+
+LANGUAGE: python
+CODE:
+```
+@mcp.resource("resource://user-data")
+async def get_user_data(ctx: Context) -> dict:
+    """Fetch personalized user data based on the request context."""
+    # Context is available as the ctx parameter
+    return {"user_id": "example"}
+
+@mcp.resource("resource://users/{user_id}/profile")
+async def get_user_profile(user_id: str, ctx: Context) -> dict:
+    """Fetch user profile with context-aware logging."""
+    # Context is available as the ctx parameter
+    return {"id": user_id}
+```
+
+----------------------------------------
+
+TITLE: Handling Tool Call Errors with fastmcp Client (Python)
+DESCRIPTION: Provides an example of using a `try...except` block to handle potential errors that may occur during a server tool call using `client.call_tool()`. It shows how to catch `fastmcp.client.ClientError` for server-side tool exceptions and standard Python exceptions for connection issues.
+SOURCE: https://gofastmcp.com/clients/client.md#_snippet_14
+
+LANGUAGE: python
+CODE:
+```
+async def safe_call_tool():
+    async with client:
+        try:
+            # Assume 'divide' tool exists and might raise ZeroDivisionError
+            result = await client.call_tool("divide", {"a": 10, "b": 0})
+            print(f"Result: {result}")
+        except ClientError as e:
+            print(f"Tool call failed: {e}")
+        except ConnectionError as e:
+            print(f"Connection failed: {e}")
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+```
+
+----------------------------------------
+
+TITLE: Summarizing Document from FastMCP Resource (Python)
+DESCRIPTION: Shows how to access and read content from a resource registered with the FastMCP server using `ctx.read_resource`. It takes a resource URI, reads its content, and performs a simple summary based on the text length. Requires the `Context` object and a valid resource URI.
+SOURCE: https://gofastmcp.com/servers/context.md#_snippet_6
+
+LANGUAGE: python
+CODE:
+```
+@mcp.tool()
+async def summarize_document(document_uri: str, ctx: Context) -> str:
+    """Summarize a document by its resource URI."""
+    # Read the document content
+    content_list = await ctx.read_resource(document_uri)
+    
+    if not content_list:
+        return "Document is empty"
+    
+    document_text = content_list[0].content
+    
+    # Example: Generate a simple summary (length-based)
+    words = document_text.split()
+    total_words = len(words)
+    
+    await ctx.info(f"Document has {total_words} words")
+    
+    # Return a simple summary
+    if total_words > 100:
+        summary = " ".join(words[:100]) + "..."
+        return f"Summary ({total_words} words total): {summary}"
+    else:
+        return f"Full document ({total_words} words): {document_text}"
+```
+
+----------------------------------------
+
+TITLE: Analyzing Data with FastMCP Logging (Python)
+DESCRIPTION: Demonstrates how to use the `Context` object's logging methods (`debug`, `info`, `warning`, `error`) within a FastMCP tool function. It processes a list of numbers, calculates the average, and logs various stages and potential errors. Requires the `Context` object passed to the tool function.
+SOURCE: https://gofastmcp.com/servers/context.md#_snippet_4
+
+LANGUAGE: python
+CODE:
+```
+@mcp.tool()
+async def analyze_data(data: list[float], ctx: Context) -> dict:
+    """Analyze numerical data with logging."""
+    await ctx.debug("Starting analysis of numerical data")
+    await ctx.info(f"Analyzing {len(data)} data points")
+    
+    try:
+        result = sum(data) / len(data)
+        await ctx.info(f"Analysis complete, average: {result}")
+        return {"average": result, "count": len(data)}
+    except ZeroDivisionError:
+        await ctx.warning("Empty data list provided")
+        return {"error": "Empty data list"}
+    except Exception as e:
+        await ctx.error(f"Analysis failed: {str(e)}")
+        raise
+```
+
+----------------------------------------
+
+TITLE: Defining a Synchronous FastMCP Tool (Python)
+DESCRIPTION: This snippet shows a basic example of defining a synchronous tool function for FastMCP using the standard `def` keyword and the `@mcp.tool` decorator. It illustrates a simple tool with type-hinted parameters and a return type.
+SOURCE: https://gofastmcp.com/servers/tools.md#_snippet_7
+
+LANGUAGE: python
+CODE:
+```
+# Synchronous tool (suitable for CPU-bound or quick tasks)
+@mcp.tool()
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate the distance between two coordinates."""
+    # Implementation...
+    return 42.5
+
+```
+
+----------------------------------------
+
+TITLE: Initializing FastMCP Client with Transport Inference (Python)
+DESCRIPTION: Demonstrates how the `fastmcp.Client` automatically infers the correct transport type based on the input provided during initialization. Shows examples using an in-memory server instance, SSE URL, WebSocket URL, and a Python script path, then prints the resulting transport objects. Requires `asyncio` and `fastmcp`.
+SOURCE: https://gofastmcp.com/clients/client.md#_snippet_1
+
+LANGUAGE: Python
+CODE:
+```
+import asyncio
+from fastmcp import Client, FastMCP
+
+# Example transports (more details in Transports page)
+server_instance = FastMCP(name="TestServer") # In-memory server
+sse_url = "http://localhost:8000/sse"       # SSE server URL
+ws_url = "ws://localhost:9000"             # WebSocket server URL
+server_script = "my_mcp_server.py"         # Path to a Python server file
+
+# Client automatically infers the transport type
+client_in_memory = Client(server_instance)
+client_sse = Client(sse_url)
+client_ws = Client(ws_url)
+client_stdio = Client(server_script)
+
+print(client_in_memory.transport)
+print(client_sse.transport)
+print(client_ws.transport)
+print(client_stdio.transport)
+
+# Expected Output (types may vary slightly based on environment):
+# <FastMCP(server='TestServer')>
+# <SSE(url='http://localhost:8000/sse')>
+# <WebSocket(url='ws://localhost:9000')>
+# <PythonStdioTransport(command='python', args=['/path/to/your/my_mcp_server.py'])>
+```
+
+----------------------------------------
+
+TITLE: Call Tool FastMCP Python
+DESCRIPTION: Executes a specific tool on the server via the FastMCP client. Arguments are passed as a dictionary and the method returns a list of content objects (like text or images) produced by the tool.
+SOURCE: https://gofastmcp.com/clients/client.md#_snippet_4
+
+LANGUAGE: python
+CODE:
+```
+result = await client.call_tool("add", {"a": 5, "b": 3})
+# result -> list[mcp.types.TextContent | mcp.types.ImageContent | ...]
+print(result[0].text) # Assuming TextContent, e.g., '8'
+```
+
+----------------------------------------
+
+TITLE: Using Streamable HTTP Transport in Python
+DESCRIPTION: Demonstrates how to connect a FastMCP client using the Streamable HTTP transport. It shows both the default inferred method for HTTP URLs (since v2.3.0) and explicit instantiation, including how to pass custom headers. This transport is recommended for web-based deployments.
+SOURCE: https://gofastmcp.com/clients/transports.md#_snippet_0
+
+LANGUAGE: Python
+CODE:
+```
+from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport
+
+http_url = "http://localhost:8000/mcp"
+
+# Option 1: Inferred transport (default for HTTP URLs)
+client_inferred = Client(http_url)
+
+# Option 2: Explicit transport (e.g., to add custom headers)
+headers = {"Authorization": "Bearer mytoken"}
+transport_explicit = StreamableHttpTransport(url=http_url, headers=headers)
+client_explicit = Client(transport_explicit)
+
+async def use_streamable_http_client(client):
+    async with client:
+        tools = await client.list_tools()
+        print(f"Connected via Streamable HTTP, found tools: {tools}")
+
+# asyncio.run(use_streamable_http_client(client_inferred))
+# asyncio.run(use_streamable_http_client(client_explicit))
+```
+
+----------------------------------------
+
+TITLE: Defining Synchronous and Asynchronous FastMCP Prompts (Python)
+DESCRIPTION: Shows examples of defining both standard synchronous (`def`) and asynchronous (`async def`) functions as FastMCP prompts. Highlights that `async def` should be used for functions performing I/O operations.
+SOURCE: https://gofastmcp.com/servers/prompts.md#_snippet_6
+
+LANGUAGE: python
+CODE:
+```
+# Synchronous prompt
+@mcp.prompt()
+def simple_question(question: str) -> str:
+    """Generates a simple question to ask the LLM."""
+    return f"Question: {question}"
+
+# Asynchronous prompt
+@mcp.prompt()
+async def data_based_prompt(data_id: str) -> str:
+    """Generates a prompt based on data that needs to be fetched."""
+    # In a real scenario, you might fetch data from a database or API
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"https://api.example.com/data/{data_id}") as response:
+            data = await response.json()
+            return f"Analyze this data: {data['content']}"
+```
+
+----------------------------------------
+
+TITLE: Read Resource FastMCP Python
+DESCRIPTION: Reads the content of a resource or a resolved template using the FastMCP client. The method accepts a URI and returns a list of resource content objects, which can be text or binary.
+SOURCE: https://gofastmcp.com/clients/client.md#_snippet_7
+
+LANGUAGE: python
+CODE:
+```
+# Read a static resource
+readme_content = await client.read_resource("file:///path/to/README.md")
+# readme_content -> list[mcp.types.TextResourceContents | mcp.types.BlobResourceContents]
+print(readme_content[0].text) # Assuming text
+
+# Read a resource generated from a template
+weather_content = await client.read_resource("data://weather/london")
+print(weather_content[0].text) # Assuming text JSON
+```
+
+----------------------------------------
+
+TITLE: Defining Asynchronous Resources (Python)
+DESCRIPTION: Explains the use of `async def` for FastMCP resource functions that perform I/O operations (like file reading or network requests) to prevent blocking the server. Includes an example of reading a log file asynchronously.
+SOURCE: https://gofastmcp.com/servers/resources.md#_snippet_4
+
+LANGUAGE: python
+CODE:
+```
+import aiofiles
+from fastmcp import FastMCP
+
+mcp = FastMCP(name="DataServer")
+
+@mcp.resource("file:///app/data/important_log.txt", mime_type="text/plain")
+async def read_important_log() -> str:
+    """Reads content from a specific log file asynchronously."""
+    try:
+        async with aiofiles.open("/app/data/important_log.txt", mode="r") as f:
+            content = await f.read()
+        return content
+    except FileNotFoundError:
+        return "Log file not found."
+```
+
+----------------------------------------
+
+TITLE: Configure LLM Sampling Handler FastMCP Python
+DESCRIPTION: Configures the FastMCP client to handle server-requested LLM completions by providing a custom `sampling_handler` function. This function receives messages and parameters from the server and should return a string completion.
+SOURCE: https://gofastmcp.com/clients/client.md#_snippet_9
+
+LANGUAGE: python
+CODE:
+```
+import marvin
+from fastmcp import Client
+from fastmcp.client.sampling import (
+    SamplingMessage,
+    SamplingParams,
+    RequestContext,
+)
+
+async def sampling_handler(
+    messages: list[SamplingMessage],
+    params: SamplingParams,
+    context: RequestContext
+) -> str:
+    return await marvin.say_async(
+        message=[m.content.text for m in messages],
+        instructions=params.systemPrompt,
+    )
+
+client = Client(
+    ...,
+    sampling_handler=sampling_handler,
+)
+```
+
+----------------------------------------
+
+TITLE: Running FastMCP Server with __main__ block in Python
+DESCRIPTION: To make the server executable directly as a Python script, this code adds a standard `if __name__ == "__main__":` block that calls the server's `run()` method.
+SOURCE: https://gofastmcp.com/getting-started/quickstart.md#_snippet_3
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP, Client
+
+mcp = FastMCP("My MCP Server")
+
+@mcp.tool()
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+----------------------------------------
+
+TITLE: Running FastMCP ASGI App with Uvicorn (Python)
+DESCRIPTION: This Python script demonstrates how to run the FastMCP ASGI application instance obtained via `http_app()` using the Uvicorn server programmatically. It sets up the server to listen on all interfaces and a specified port.
+SOURCE: https://gofastmcp.com/deployment/asgi.md#_snippet_3
+
+LANGUAGE: python
+CODE:
+```
+from fastmcp import FastMCP
+import uvicorn
+
+mcp = FastMCP("MyServer")
+
+http_app = mcp.http_app()
+
+if __name__ == "__main__":
+    uvicorn.run(http_app, host="0.0.0.0", port=8000)
+```

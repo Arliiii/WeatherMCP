@@ -1,0 +1,126 @@
+name: openweather-mcp
+description: OpenWeatherMap MCP Server that provides weather data through the Model-Controller-Provider architecture
+version: 1.0.0
+author: ArlindaWeather
+
+# Define the start command for the MCP server
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP
+    type: object
+    properties:
+      apiKey:
+        type: string
+        description: OpenWeatherMap API key
+      units:
+        type: string
+        enum: [metric, imperial, standard]
+        default: metric
+        description: Default units of measurement
+      language:
+        type: string
+        default: en
+        description: Default language for weather descriptions
+    required: [apiKey]
+  commandFunction: |-
+    (config) => {
+      // Create a temporary .env file with the API key
+      const fs = require('fs');
+      fs.writeFileSync('.env', `OPENWEATHER_API_KEY=${config.apiKey}\n`);
+      
+      // Return the command to run the server
+      return { 
+        command: 'python', 
+        args: ['server.py'] 
+      };
+    }
+  exampleConfig:
+    apiKey: "your_openweather_api_key_here"
+    units: "metric"
+    language: "en"
+
+# Define the capabilities of the MCP server
+capabilities:
+  tools:
+    - name: get_weather_by_city
+      description: Get current weather information for a city
+      parameters:
+        - name: city
+          type: string
+          description: City name (e.g., 'London')
+          required: true
+        - name: country_code
+          type: string
+          description: Country code (e.g., 'uk' for United Kingdom)
+          required: false
+        - name: units
+          type: string
+          description: Units of measurement ('metric', 'imperial', or 'standard')
+          required: false
+          default: metric
+        - name: lang
+          type: string
+          description: Language for weather descriptions (e.g., 'en', 'es', 'fr')
+          required: false
+          default: en
+    
+    - name: get_weather_by_coordinates
+      description: Get current weather information for geographic coordinates
+      parameters:
+        - name: latitude
+          type: number
+          description: Latitude coordinate (-90 to 90)
+          required: true
+        - name: longitude
+          type: number
+          description: Longitude coordinate (-180 to 180)
+          required: true
+        - name: units
+          type: string
+          description: Units of measurement ('metric', 'imperial', or 'standard')
+          required: false
+          default: metric
+        - name: lang
+          type: string
+          description: Language for weather descriptions (e.g., 'en', 'es', 'fr')
+          required: false
+          default: en
+    
+    - name: get_weather_by_zip
+      description: Get current weather information for a zip/postal code
+      parameters:
+        - name: zip_code
+          type: string
+          description: Zip/postal code (e.g., '94040')
+          required: true
+        - name: country_code
+          type: string
+          description: Country code (e.g., 'us' for United States)
+          required: false
+          default: us
+        - name: units
+          type: string
+          description: Units of measurement ('metric', 'imperial', or 'standard')
+          required: false
+          default: metric
+        - name: lang
+          type: string
+          description: Language for weather descriptions (e.g., 'en', 'es', 'fr')
+          required: false
+          default: en
+
+  resources:
+    - name: weather://about
+      description: Provides information about the OpenWeatherMap MCP server
+
+# Define the build configuration
+build:
+  dockerfile: Dockerfile
+  context: .
+
+# Define the environment variables
+env:
+  - name: OPENWEATHER_API_KEY
+    description: OpenWeatherMap API key
+    required: true
